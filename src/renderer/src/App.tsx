@@ -2312,7 +2312,7 @@ function App() {
           </> : <>
             <DialogHeader><DialogTitle>Updating to v{updateStatus?.version}</DialogTitle><DialogDescription>{updateStatus?.state === 'downloaded' ? 'Download complete. Restarting to finish the update…' : 'Downloading the update. The app will restart when it is ready.'}</DialogDescription></DialogHeader>
             {updateStatus?.state === 'downloading' && <div className="dialog-form">
-              <div style={{ height: 8, borderRadius: 4, background: 'var(--muted)', overflow: 'hidden' }}><div style={{ width: `${updateStatus.percent}%`, height: '100%', background: 'var(--primary)', transition: 'width 200ms ease' }} /></div>
+              <div style={{ height: 8, borderRadius: 4, background: 'var(--graphite-line-soft)', overflow: 'hidden' }}><div style={{ width: `${updateStatus.percent}%`, height: '100%', background: 'var(--graphite-blue)', transition: 'width 200ms ease' }} /></div>
               <p>{updateStatus.percent}%</p>
             </div>}
           </>}
