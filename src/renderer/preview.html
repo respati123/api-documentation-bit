@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="UTF-8" /><title>Desktop design preview</title></head>
+<body><div id="root"></div><script>
+  const emptyVariables = { globals: [], environments: [] }
+  let workspace
+  window.apiDesktop = {
+    secureStorageAvailable: async () => false,
+    loadWorkspace: async (tree) => {
+      workspace = { id: 'design-preview', name: 'Local workspace', tree, baseTree: tree, variables: emptyVariables, baseVariables: emptyVariables, activeEnvironmentId: null, role: 'owner' }
+      return workspace
+    },
+    listWorkspaces: async () => [workspace],
+    saveWorkspace: async () => undefined,
+    loadSession: async () => null,
+    clearSession: async () => undefined,
+    listCommits: async () => [],
+    onExternalWorkspaceChange: () => () => undefined,
+    onInviteToken: () => () => undefined,
+    sendRequest: async () => { throw new Error('Preview only') }
+  }
+</script><script type="module" src="/src/main.tsx"></script></body></html>

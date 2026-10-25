@@ -1,0 +1,11 @@
+{
+  "name": "api-documentation-cloud-server",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "nodemailer": "^10.1.7"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^8.0.2"
+  }
+}

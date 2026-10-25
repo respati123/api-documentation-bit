@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/challenger-dark.html"
+        ],
+        "createdAt": "2026-10-24T13:55:57.255Z",
+        "reason": "Decision sketch has explicit light body text on a graphite background; detector reports inherited text as black"
+      }
+    ]
+  }
+}
