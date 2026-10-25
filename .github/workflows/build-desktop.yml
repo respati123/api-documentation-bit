@@ -18,7 +18,9 @@ jobs:
           - os: ubuntu-latest
             script: dist:linux
             artifact: linux
-            path: release/*.AppImage release/*.deb
+            path: |
+              release/*.AppImage
+              release/*.deb
           - os: macos-latest
             script: dist:mac
             artifact: macos
