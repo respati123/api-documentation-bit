@@ -173,6 +173,8 @@ function createWindow(): void {
     }
   })
   mainWindow = window
+  // Check again when the user brings the app back to the front.
+  window.on('focus', () => checkForUpdatesNow?.())
   window.on('closed', () => { if (mainWindow === window) mainWindow = undefined })
   window.webContents.once('did-finish-load', () => {
     if (pendingInviteToken) {
@@ -375,7 +377,9 @@ ipcMain.handle('session:clear', () => {
 })
 
 let latestUpdateStatus: UpdateStatus | undefined
-const updateCheckIntervalMs = 4 * 60 * 60 * 1000
+const updateCheckIntervalMs = 10 * 60 * 1000
+let checkForUpdatesNow: (() => void) | undefined
+const minUpdateCheckGapMs = 60 * 1000
 
 // Auto-update runs only in packaged builds. The feed comes from the publish
 // config in package.json; API_DOCS_UPDATE_URL overrides it for local testing.
@@ -395,9 +399,17 @@ function setupAutoUpdate(): void {
   })
   autoUpdater.on('update-downloaded', (info) => sendUpdateStatus({ state: 'downloaded', version: info.version }))
   autoUpdater.on('error', (error) => console.error('Auto-update check failed:', error))
-  const check = () => { void autoUpdater.checkForUpdates().catch((error) => console.error('Auto-update check failed:', error)) }
-  check()
-  setInterval(check, updateCheckIntervalMs).unref()
+  // Skip while an update is already found or downloading, and never check twice within a minute
+  // (window focus and the timer can fire close together).
+  let lastCheckAt = 0
+  checkForUpdatesNow = () => {
+    if (latestUpdateStatus?.state === 'downloaded' || latestUpdateStatus?.state === 'downloading') return
+    if (Date.now() - lastCheckAt < minUpdateCheckGapMs) return
+    lastCheckAt = Date.now()
+    void autoUpdater.checkForUpdates().catch((error) => console.error('Auto-update check failed:', error))
+  }
+  checkForUpdatesNow()
+  setInterval(() => checkForUpdatesNow?.(), updateCheckIntervalMs).unref()
 }
 
 ipcMain.handle('update:install', () => autoUpdater.quitAndInstall())
