@@ -9,7 +9,10 @@ import updaterModule from 'electron-updater'
 // electron-updater is CommonJS; named imports fail when Electron loads the ESM main bundle.
 const { autoUpdater } = updaterModule
 
-type UpdateStatus = { state: 'downloaded'; version: string }
+type UpdateStatus =
+  | { state: 'available'; version: string }
+  | { state: 'downloading'; version: string; percent: number }
+  | { state: 'downloaded'; version: string }
 
 // Required for app.on('second-instance') to fire on Windows/Linux when the app
 // is already running and the OS re-invokes it through the api-docs:// protocol
@@ -381,10 +384,16 @@ function setupAutoUpdate(): void {
   if (process.env.API_DOCS_UPDATE_URL) autoUpdater.setFeedURL({ provider: 'generic', url: process.env.API_DOCS_UPDATE_URL })
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
-  autoUpdater.on('update-downloaded', (info) => {
-    latestUpdateStatus = { state: 'downloaded', version: info.version }
-    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:status', latestUpdateStatus)
+  const sendUpdateStatus = (status: UpdateStatus) => {
+    latestUpdateStatus = status
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:status', status)
+  }
+  autoUpdater.on('update-available', (info) => sendUpdateStatus({ state: 'available', version: info.version }))
+  autoUpdater.on('download-progress', (progress) => {
+    const version = latestUpdateStatus && 'version' in latestUpdateStatus ? latestUpdateStatus.version : ''
+    sendUpdateStatus({ state: 'downloading', version, percent: Math.floor(progress.percent) })
   })
+  autoUpdater.on('update-downloaded', (info) => sendUpdateStatus({ state: 'downloaded', version: info.version }))
   autoUpdater.on('error', (error) => console.error('Auto-update check failed:', error))
   const check = () => { void autoUpdater.checkForUpdates().catch((error) => console.error('Auto-update check failed:', error)) }
   check()

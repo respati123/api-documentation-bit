@@ -10,7 +10,10 @@ ipcRenderer.on('invite:token', (_event, token: string) => {
   if (inviteHandlers.size) pendingInviteToken = null
 })
 
-type UpdateStatus = { state: 'downloaded'; version: string }
+type UpdateStatus =
+  | { state: 'available'; version: string }
+  | { state: 'downloading'; version: string; percent: number }
+  | { state: 'downloaded'; version: string }
 const updateHandlers = new Set<(status: UpdateStatus) => void>()
 ipcRenderer.on('update:status', (_event, status: UpdateStatus) => updateHandlers.forEach((handler) => handler(status)))
 

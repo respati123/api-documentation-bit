@@ -1484,8 +1484,8 @@ function App() {
     })()
   }), [inviteTokenDraft])
   const clearAuthError = useCallback(() => setAuthError(''), [])
-  const [updateReady, setUpdateReady] = useState<string | null>(null)
-  useEffect(() => window.apiDesktop.onUpdateStatus((status) => setUpdateReady(status.version)), [])
+  const [updateStatus, setUpdateStatus] = useState<{ state: 'available' | 'downloading' | 'downloaded'; version: string; percent?: number } | null>(null)
+  useEffect(() => window.apiDesktop.onUpdateStatus(setUpdateStatus), [])
 
   async function signOut() {
     if (sessionToken) await apiCall('/api/auth/logout', { token: sessionToken, method: 'POST' }).catch(() => undefined)
@@ -2299,7 +2299,9 @@ function App() {
             <span className="signed-in-email">{user.email}</span>
             <Button variant="ghost" size="sm" onClick={() => void signOut()}>Sign out</Button>
           </> : null}
-          {updateReady && <Button size="sm" onClick={() => void window.apiDesktop.installUpdate()}>Restart to update to v{updateReady}</Button>}
+          {updateStatus?.state === 'downloaded' && <Button size="sm" onClick={() => void window.apiDesktop.installUpdate()}>Restart to update to v{updateStatus.version}</Button>}
+          {updateStatus?.state === 'available' && <Button size="sm" variant="outline" disabled>Update v{updateStatus.version} found…</Button>}
+          {updateStatus?.state === 'downloading' && <Button size="sm" variant="outline" disabled>Downloading v{updateStatus.version} · {updateStatus.percent}%</Button>}
           <AuthDialog showTrigger={!user} onBeginSignIn={beginBrowserSignIn} openRequest={authOpenRequest} initialError={authError} onOpen={clearAuthError} />
         </div>
       </header>
