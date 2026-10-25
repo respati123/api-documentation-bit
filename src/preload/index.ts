@@ -14,6 +14,7 @@ type UpdateStatus =
   | { state: 'available'; version: string }
   | { state: 'downloading'; version: string; percent: number }
   | { state: 'downloaded'; version: string }
+  | { state: 'error'; version: string; message: string }
 const updateHandlers = new Set<(status: UpdateStatus) => void>()
 ipcRenderer.on('update:status', (_event, status: UpdateStatus) => updateHandlers.forEach((handler) => handler(status)))
 
@@ -51,7 +52,7 @@ contextBridge.exposeInMainWorld('apiDesktop', {
     }
     return () => inviteHandlers.delete(handler)
   },
-  installUpdate: () => ipcRenderer.invoke('update:install') as Promise<void>,
+  downloadUpdate: (version: string) => ipcRenderer.invoke('update:download', version) as Promise<void>,
   onUpdateStatus: (handler: (status: UpdateStatus) => void) => {
     updateHandlers.add(handler)
     void ipcRenderer.invoke('update:latest').then((status: UpdateStatus | null) => { if (status) handler(status) })

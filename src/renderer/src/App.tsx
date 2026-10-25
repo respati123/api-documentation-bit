@@ -1484,7 +1484,7 @@ function App() {
     })()
   }), [inviteTokenDraft])
   const clearAuthError = useCallback(() => setAuthError(''), [])
-  const [updateStatus, setUpdateStatus] = useState<{ state: 'available' | 'downloading' | 'downloaded'; version: string; percent?: number } | null>(null)
+  const [updateStatus, setUpdateStatus] = useState<{ state: 'available' | 'downloading' | 'downloaded'; version: string; percent?: number } | { state: 'error'; version: string; message: string } | null>(null)
   useEffect(() => window.apiDesktop.onUpdateStatus(setUpdateStatus), [])
 
   async function signOut() {
@@ -2299,13 +2299,25 @@ function App() {
             <span className="signed-in-email">{user.email}</span>
             <Button variant="ghost" size="sm" onClick={() => void signOut()}>Sign out</Button>
           </> : null}
-          {updateStatus?.state === 'downloaded' && <Button size="sm" onClick={() => void window.apiDesktop.installUpdate()}>Restart to update to v{updateStatus.version}</Button>}
-          {updateStatus?.state === 'available' && <Button size="sm" variant="outline" disabled>Update v{updateStatus.version} found…</Button>}
-          {updateStatus?.state === 'downloading' && <Button size="sm" variant="outline" disabled>Downloading v{updateStatus.version} · {updateStatus.percent}%</Button>}
+          {updateStatus?.state === 'available' && <Button size="sm" onClick={() => void window.apiDesktop.downloadUpdate(updateStatus.version)}>Update to v{updateStatus.version}</Button>}
           <AuthDialog showTrigger={!user} onBeginSignIn={beginBrowserSignIn} openRequest={authOpenRequest} initialError={authError} onOpen={clearAuthError} />
         </div>
       </header>
 
+      <Dialog open={Boolean(updateStatus && updateStatus.state !== 'available')} onOpenChange={(open) => { if (!open && updateStatus?.state === 'error') setUpdateStatus(null) }}>
+        <DialogContent>
+          {updateStatus?.state === 'error' ? <>
+            <DialogHeader><DialogTitle>Update failed</DialogTitle><DialogDescription>{updateStatus.message}</DialogDescription></DialogHeader>
+            <div className="dialog-form"><Button type="button" onClick={() => setUpdateStatus(null)}>Close</Button></div>
+          </> : <>
+            <DialogHeader><DialogTitle>Updating to v{updateStatus?.version}</DialogTitle><DialogDescription>{updateStatus?.state === 'downloaded' ? 'Download complete. Restarting to finish the update…' : 'Downloading the update. The app will restart when it is ready.'}</DialogDescription></DialogHeader>
+            {updateStatus?.state === 'downloading' && <div className="dialog-form">
+              <div style={{ height: 8, borderRadius: 4, background: 'var(--muted)', overflow: 'hidden' }}><div style={{ width: `${updateStatus.percent}%`, height: '100%', background: 'var(--primary)', transition: 'width 200ms ease' }} /></div>
+              <p>{updateStatus.percent}%</p>
+            </div>}
+          </>}
+        </DialogContent>
+      </Dialog>
       <VariablesDialog open={variablesDialogOpen} onOpenChange={setVariablesDialogOpen} variables={workspaceVariables} activeEnvironmentId={activeEnvironmentId} readOnly={Boolean(isReadOnly)} secureStorageAvailable={secureStorageAvailable} onVariablesChange={updateWorkspaceVariables} onActiveEnvironmentChange={(id) => id ? openEnvironmentTab(id) : updateActiveEnvironment(null)} />
       <VariableQuickEditDialog target={quickEditTarget} variables={workspaceVariables} activeEnvironmentId={activeEnvironmentId} resolvedValues={resolvedVariables} readOnly={Boolean(isReadOnly)} onClose={() => setQuickEditTarget(null)} onSave={saveQuickVariable} />
       <OpenApiDialog open={openApiDialogOpen} onOpenChange={setOpenApiDialogOpen} tree={tree} workspaceName={activeWorkspace?.name ?? 'My workspace'} readOnly={Boolean(isReadOnly)} onImport={(imported) => {

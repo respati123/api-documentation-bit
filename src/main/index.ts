@@ -13,6 +13,7 @@ type UpdateStatus =
   | { state: 'available'; version: string }
   | { state: 'downloading'; version: string; percent: number }
   | { state: 'downloaded'; version: string }
+  | { state: 'error'; version: string; message: string }
 
 // Required for app.on('second-instance') to fire on Windows/Linux when the app
 // is already running and the OS re-invokes it through the api-docs:// protocol
@@ -386,8 +387,9 @@ const minUpdateCheckGapMs = 60 * 1000
 function setupAutoUpdate(): void {
   if (!app.isPackaged) return
   if (process.env.API_DOCS_UPDATE_URL) autoUpdater.setFeedURL({ provider: 'generic', url: process.env.API_DOCS_UPDATE_URL })
-  autoUpdater.autoDownload = true
-  autoUpdater.autoInstallOnAppQuit = true
+  // Nothing is downloaded until the user asks for it; the download starts from downloadUpdate().
+  autoUpdater.autoDownload = false
+  autoUpdater.autoInstallOnAppQuit = false
   const sendUpdateStatus = (status: UpdateStatus) => {
     latestUpdateStatus = status
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:status', status)
@@ -397,13 +399,22 @@ function setupAutoUpdate(): void {
     const version = latestUpdateStatus && 'version' in latestUpdateStatus ? latestUpdateStatus.version : ''
     sendUpdateStatus({ state: 'downloading', version, percent: Math.floor(progress.percent) })
   })
-  autoUpdater.on('update-downloaded', (info) => sendUpdateStatus({ state: 'downloaded', version: info.version }))
-  autoUpdater.on('error', (error) => console.error('Auto-update check failed:', error))
+  autoUpdater.on('update-downloaded', (info) => {
+    sendUpdateStatus({ state: 'downloaded', version: info.version })
+    // Restart automatically once the download is complete, after a short pause so the dialog can show it.
+    setTimeout(() => autoUpdater.quitAndInstall(), 1500)
+  })
+  autoUpdater.on('error', (error) => {
+    console.error('Auto-update failed:', error)
+    if (latestUpdateStatus?.state === 'downloading') {
+      sendUpdateStatus({ state: 'error', version: latestUpdateStatus.version, message: error.message })
+    }
+  })
   // Skip while an update is already found or downloading, and never check twice within a minute
   // (window focus and the timer can fire close together).
   let lastCheckAt = 0
   checkForUpdatesNow = () => {
-    if (latestUpdateStatus?.state === 'downloaded' || latestUpdateStatus?.state === 'downloading') return
+    if (latestUpdateStatus && ['available', 'downloading', 'downloaded'].includes(latestUpdateStatus.state)) return
     if (Date.now() - lastCheckAt < minUpdateCheckGapMs) return
     lastCheckAt = Date.now()
     void autoUpdater.checkForUpdates().catch((error) => console.error('Auto-update check failed:', error))
@@ -412,7 +423,12 @@ function setupAutoUpdate(): void {
   setInterval(() => checkForUpdatesNow?.(), updateCheckIntervalMs).unref()
 }
 
-ipcMain.handle('update:install', () => autoUpdater.quitAndInstall())
+ipcMain.handle('update:download', (_event, version: string) => {
+  // Show the progress dialog immediately, before the first progress event arrives.
+  latestUpdateStatus = { state: 'downloading', version, percent: 0 }
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:status', latestUpdateStatus)
+  void autoUpdater.downloadUpdate().catch((error: Error) => console.error('Auto-update download failed:', error))
+})
 ipcMain.handle('update:latest', () => latestUpdateStatus ?? null)
 
 app.whenReady().then(() => {
