@@ -65,6 +65,7 @@ interface Window {
     onInviteToken(handler: (token: string) => void): () => void
     beginBrowserSignIn(cloudUrl: string): Promise<void>
     downloadUpdate(version: string): Promise<void>
+    getAppVersion(): Promise<string>
     onUpdateStatus(handler: (status: { state: 'available'; version: string } | { state: 'downloading'; version: string; percent: number } | { state: 'downloaded'; version: string } | { state: 'error'; version: string; message: string }) => void): () => void
     onAuthCode(handler: (code: string) => void): () => void
   }

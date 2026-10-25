@@ -1484,6 +1484,9 @@ function App() {
     })()
   }), [inviteTokenDraft])
   const clearAuthError = useCallback(() => setAuthError(''), [])
+  const [helpOpen, setHelpOpen] = useState(false)
+  const [appVersion, setAppVersion] = useState('')
+  useEffect(() => { if (helpOpen) void window.apiDesktop.getAppVersion().then(setAppVersion) }, [helpOpen])
   const [updateStatus, setUpdateStatus] = useState<{ state: 'available' | 'downloading' | 'downloaded'; version: string; percent?: number } | { state: 'error'; version: string; message: string } | null>(null)
   useEffect(() => window.apiDesktop.onUpdateStatus(setUpdateStatus), [])
 
@@ -2299,11 +2302,17 @@ function App() {
             <span className="signed-in-email">{user.email}</span>
             <Button variant="ghost" size="sm" onClick={() => void signOut()}>Sign out</Button>
           </> : null}
+          <Button variant="ghost" size="sm" onClick={() => setHelpOpen(true)}>Help</Button>
           {updateStatus?.state === 'available' && <Button size="sm" onClick={() => void window.apiDesktop.downloadUpdate(updateStatus.version)}>Update to v{updateStatus.version}</Button>}
           <AuthDialog showTrigger={!user} onBeginSignIn={beginBrowserSignIn} openRequest={authOpenRequest} initialError={authError} onOpen={clearAuthError} />
         </div>
       </header>
 
+      <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>API Documentation</DialogTitle><DialogDescription>Version {appVersion || '…'}</DialogDescription></DialogHeader>
+        </DialogContent>
+      </Dialog>
       <Dialog open={Boolean(updateStatus && updateStatus.state !== 'available')} onOpenChange={(open) => { if (!open && updateStatus?.state === 'error') setUpdateStatus(null) }}>
         <DialogContent>
           {updateStatus?.state === 'error' ? <>

@@ -53,6 +53,7 @@ contextBridge.exposeInMainWorld('apiDesktop', {
     return () => inviteHandlers.delete(handler)
   },
   downloadUpdate: (version: string) => ipcRenderer.invoke('update:download', version) as Promise<void>,
+  getAppVersion: () => ipcRenderer.invoke('app:version') as Promise<string>,
   onUpdateStatus: (handler: (status: UpdateStatus) => void) => {
     updateHandlers.add(handler)
     void ipcRenderer.invoke('update:latest').then((status: UpdateStatus | null) => { if (status) handler(status) })

@@ -430,6 +430,7 @@ ipcMain.handle('update:download', (_event, version: string) => {
   void autoUpdater.downloadUpdate().catch((error: Error) => console.error('Auto-update download failed:', error))
 })
 ipcMain.handle('update:latest', () => latestUpdateStatus ?? null)
+ipcMain.handle('app:version', () => app.getVersion())
 
 app.whenReady().then(() => {
   watchExternalWorkspaceChanges()
