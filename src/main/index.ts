@@ -4,6 +4,12 @@ import { readFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import type { WorkspaceVariables } from '../renderer/src/lib/workspace-variables'
 import { startLoopbackSignIn, type LoopbackSignIn } from './loopback-auth'
+import updaterModule from 'electron-updater'
+
+// electron-updater is CommonJS; named imports fail when Electron loads the ESM main bundle.
+const { autoUpdater } = updaterModule
+
+type UpdateStatus = { state: 'downloaded'; version: string }
 
 // Required for app.on('second-instance') to fire on Windows/Linux when the app
 // is already running and the OS re-invokes it through the api-docs:// protocol
@@ -365,8 +371,32 @@ ipcMain.handle('session:clear', () => {
   database().prepare('DELETE FROM secrets WHERE key = ?').run('api-session')
 })
 
+let latestUpdateStatus: UpdateStatus | undefined
+const updateCheckIntervalMs = 4 * 60 * 60 * 1000
+
+// Auto-update runs only in packaged builds. The feed comes from the publish
+// config in package.json; API_DOCS_UPDATE_URL overrides it for local testing.
+function setupAutoUpdate(): void {
+  if (!app.isPackaged) return
+  if (process.env.API_DOCS_UPDATE_URL) autoUpdater.setFeedURL({ provider: 'generic', url: process.env.API_DOCS_UPDATE_URL })
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+  autoUpdater.on('update-downloaded', (info) => {
+    latestUpdateStatus = { state: 'downloaded', version: info.version }
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('update:status', latestUpdateStatus)
+  })
+  autoUpdater.on('error', (error) => console.error('Auto-update check failed:', error))
+  const check = () => { void autoUpdater.checkForUpdates().catch((error) => console.error('Auto-update check failed:', error)) }
+  check()
+  setInterval(check, updateCheckIntervalMs).unref()
+}
+
+ipcMain.handle('update:install', () => autoUpdater.quitAndInstall())
+ipcMain.handle('update:latest', () => latestUpdateStatus ?? null)
+
 app.whenReady().then(() => {
   watchExternalWorkspaceChanges()
+  setupAutoUpdate()
   if (process.defaultApp && process.argv.length >= 2) app.setAsDefaultProtocolClient('api-docs', process.execPath, [process.argv[1]])
   else app.setAsDefaultProtocolClient('api-docs')
   createWindow()

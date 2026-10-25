@@ -54,7 +54,8 @@
     },
     "mac": {
       "target": [
-        "dmg"
+        "dmg",
+        "zip"
       ],
       "category": "public.app-category.developer-tools"
     },
@@ -65,7 +66,16 @@
     },
     "deb": {
       "maintainer": "API Documentation <no-reply@example.test>"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "respati123",
+        "repo": "api-documentation-bit",
+        "releaseType": "release"
+      }
+    ],
+    "artifactName": "api-documentation-${version}.${ext}"
   },
   "dependencies": {
     "@fontsource/poppins": "^5.3.0",
@@ -77,6 +87,7 @@
     "@radix-ui/react-tabs": "^1.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "electron-updater": "^6.8.11",
     "lucide-react": "^1.59.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",

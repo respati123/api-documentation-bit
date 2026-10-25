@@ -1484,6 +1484,8 @@ function App() {
     })()
   }), [inviteTokenDraft])
   const clearAuthError = useCallback(() => setAuthError(''), [])
+  const [updateReady, setUpdateReady] = useState<string | null>(null)
+  useEffect(() => window.apiDesktop.onUpdateStatus((status) => setUpdateReady(status.version)), [])
 
   async function signOut() {
     if (sessionToken) await apiCall('/api/auth/logout', { token: sessionToken, method: 'POST' }).catch(() => undefined)
@@ -2297,6 +2299,7 @@ function App() {
             <span className="signed-in-email">{user.email}</span>
             <Button variant="ghost" size="sm" onClick={() => void signOut()}>Sign out</Button>
           </> : null}
+          {updateReady && <Button size="sm" onClick={() => void window.apiDesktop.installUpdate()}>Restart to update to v{updateReady}</Button>}
           <AuthDialog showTrigger={!user} onBeginSignIn={beginBrowserSignIn} openRequest={authOpenRequest} initialError={authError} onOpen={clearAuthError} />
         </div>
       </header>

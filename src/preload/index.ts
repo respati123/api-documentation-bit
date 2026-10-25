@@ -10,6 +10,10 @@ ipcRenderer.on('invite:token', (_event, token: string) => {
   if (inviteHandlers.size) pendingInviteToken = null
 })
 
+type UpdateStatus = { state: 'downloaded'; version: string }
+const updateHandlers = new Set<(status: UpdateStatus) => void>()
+ipcRenderer.on('update:status', (_event, status: UpdateStatus) => updateHandlers.forEach((handler) => handler(status)))
+
 let pendingAuthCode: string | null = null
 const authCodeHandlers = new Set<(code: string) => void>()
 
@@ -43,6 +47,12 @@ contextBridge.exposeInMainWorld('apiDesktop', {
       pendingInviteToken = null
     }
     return () => inviteHandlers.delete(handler)
+  },
+  installUpdate: () => ipcRenderer.invoke('update:install') as Promise<void>,
+  onUpdateStatus: (handler: (status: UpdateStatus) => void) => {
+    updateHandlers.add(handler)
+    void ipcRenderer.invoke('update:latest').then((status: UpdateStatus | null) => { if (status) handler(status) })
+    return () => updateHandlers.delete(handler)
   },
   beginBrowserSignIn: (cloudUrl: string) => ipcRenderer.invoke('auth:begin', cloudUrl) as Promise<void>,
   onAuthCode: (handler: (code: string) => void) => {
