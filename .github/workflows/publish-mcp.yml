@@ -1,8 +1,7 @@
 name: Publish MCP package
 
 # Publishes packages/api-documentation-mcp to npm. Runs on a tag like mcp-v0.1.1
-# or manually. Authentication uses npm trusted publishing (OIDC), so no npm token
-# is stored in the repository.
+# or manually. Authentication uses the NPM_TOKEN repository secret.
 on:
   workflow_dispatch:
   push:
@@ -11,7 +10,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
   publish:
@@ -23,10 +21,6 @@ jobs:
         with:
           node-version: 22
           registry-url: https://registry.npmjs.org
-
-      # Trusted publishing needs npm 11.5.1 or newer.
-      - name: Upgrade npm
-        run: npm install -g npm@^11.5.1
 
       - run: npm ci
 
@@ -44,4 +38,6 @@ jobs:
 
       - name: Publish
         working-directory: packages/api-documentation-mcp
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --access public
