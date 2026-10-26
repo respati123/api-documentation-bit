@@ -1,0 +1,24 @@
+{
+  "name": "api-documentation-mcp",
+  "version": "0.1.0",
+  "description": "Local MCP server for API Documentation desktop app workspaces, collections, and requests",
+  "type": "module",
+  "bin": {
+    "api-documentation-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist/index.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "api-documentation"
+  ],
+  "scripts": {
+    "build": "node ../../scripts/build-mcp-package.mjs"
+  }
+}
