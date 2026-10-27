@@ -10,6 +10,13 @@ ipcRenderer.on('invite:token', (_event, token: string) => {
   if (inviteHandlers.size) pendingInviteToken = null
 })
 
+type AiToolId = 'codex' | 'claude-cli' | 'claude-desktop'
+type AiConnectStatus = {
+  node: { installed: boolean; version?: string }
+  tools: Array<{ id: AiToolId; supported: boolean; installed: boolean; connected: boolean }>
+}
+type NodeInstallProgress = { stage: 'checking' | 'downloading' | 'verifying' | 'extracting' | 'done'; percent?: number }
+
 type UpdateStatus =
   | { state: 'available'; version: string }
   | { state: 'downloading'; version: string; percent: number }
@@ -53,7 +60,25 @@ contextBridge.exposeInMainWorld('apiDesktop', {
     return () => inviteHandlers.delete(handler)
   },
   downloadUpdate: (version: string) => ipcRenderer.invoke('update:download', version) as Promise<void>,
-  getAppVersion: () => ipcRenderer.invoke('app:version') as Promise<string>,
+  aiStatus: () => ipcRenderer.invoke('ai:status') as Promise<AiConnectStatus>,
+  installNodeRuntime: () => ipcRenderer.invoke('ai:install-node') as Promise<string | null>,
+  installAiTool: (id: 'codex' | 'claude-cli') => ipcRenderer.invoke('ai:install-tool', id) as Promise<void>,
+  connectAiTool: (id: AiToolId) => ipcRenderer.invoke('ai:connect', id) as Promise<void>,
+  onNodeProgress: (handler: (progress: NodeInstallProgress) => void) => {
+    const listener = (_event: unknown, progress: NodeInstallProgress) => handler(progress)
+    ipcRenderer.on('ai:node-progress', listener)
+    return () => ipcRenderer.removeListener('ai:node-progress', listener)
+  },
+  onAiLog: (handler: (line: string) => void) => {
+    const listener = (_event: unknown, line: string) => handler(line)
+    ipcRenderer.on('ai:log', listener)
+    return () => ipcRenderer.removeListener('ai:log', listener)
+  },
+  onConnectAiMenu: (handler: () => void) => {
+    const listener = () => handler()
+    ipcRenderer.on('menu:connect-ai', listener)
+    return () => ipcRenderer.removeListener('menu:connect-ai', listener)
+  },
   onUpdateStatus: (handler: (status: UpdateStatus) => void) => {
     updateHandlers.add(handler)
     void ipcRenderer.invoke('update:latest').then((status: UpdateStatus | null) => { if (status) handler(status) })

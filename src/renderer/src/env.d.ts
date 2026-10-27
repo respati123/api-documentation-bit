@@ -48,6 +48,13 @@ type LocalCommit = {
   pushed: boolean
 }
 
+type AiToolId = 'codex' | 'claude-cli' | 'claude-desktop'
+type AiConnectStatus = {
+  node: { installed: boolean; version?: string }
+  tools: Array<{ id: AiToolId; supported: boolean; installed: boolean; connected: boolean }>
+}
+type NodeInstallProgress = { stage: 'checking' | 'downloading' | 'verifying' | 'extracting' | 'done'; percent?: number }
+
 interface Window {
   apiDesktop: {
     sendRequest(request: ApiRequest): Promise<ApiResponse>
@@ -65,7 +72,13 @@ interface Window {
     onInviteToken(handler: (token: string) => void): () => void
     beginBrowserSignIn(cloudUrl: string): Promise<void>
     downloadUpdate(version: string): Promise<void>
-    getAppVersion(): Promise<string>
+    aiStatus(): Promise<AiConnectStatus>
+    installNodeRuntime(): Promise<string | null>
+    installAiTool(id: 'codex' | 'claude-cli'): Promise<void>
+    connectAiTool(id: AiToolId): Promise<void>
+    onNodeProgress(handler: (progress: NodeInstallProgress) => void): () => void
+    onAiLog(handler: (line: string) => void): () => void
+    onConnectAiMenu(handler: () => void): () => void
     onUpdateStatus(handler: (status: { state: 'available'; version: string } | { state: 'downloading'; version: string; percent: number } | { state: 'downloaded'; version: string } | { state: 'error'; version: string; message: string }) => void): () => void
     onAuthCode(handler: (code: string) => void): () => void
   }

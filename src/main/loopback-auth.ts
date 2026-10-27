@@ -1,5 +1,6 @@
 import { randomBytes } from 'node:crypto'
-import { createServer, type AddressInfo } from 'node:http'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 
 // Loopback redirect for browser sign-in (RFC 8252). The desktop app listens on
 // a random 127.0.0.1 port, the browser is sent back there with a one-time code,

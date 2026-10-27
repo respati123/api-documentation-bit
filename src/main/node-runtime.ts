@@ -12,9 +12,38 @@ import { Readable } from 'node:stream'
 const nodeDistUrl = 'https://nodejs.org/dist'
 const majorVersion = 22
 
+export type NodeRuntimePaths = {
+  root: string
+  binDir: string
+  node: string
+  npm: string
+  npxCli: string
+}
+
 export type NodeRuntimeStatus =
   | { installed: false }
-  | { installed: true; version: string; binDir: string }
+  | ({ installed: true; version: string } & NodeRuntimePaths)
+
+// Absolute paths inside the downloaded Node folder. Absolute paths matter because
+// GUI apps (Claude Desktop, Codex launched from a dock) do not inherit the shell PATH.
+export function nodeRuntimePaths(root: string): NodeRuntimePaths {
+  if (process.platform === 'win32') {
+    return {
+      root,
+      binDir: root,
+      node: join(root, 'node.exe'),
+      npm: join(root, 'npm.cmd'),
+      npxCli: join(root, 'node_modules', 'npm', 'bin', 'npx-cli.js')
+    }
+  }
+  return {
+    root,
+    binDir: join(root, 'bin'),
+    node: join(root, 'bin', 'node'),
+    npm: join(root, 'bin', 'npm'),
+    npxCli: join(root, 'lib', 'node_modules', 'npm', 'bin', 'npx-cli.js')
+  }
+}
 
 export type NodeInstallProgress = { stage: 'checking' | 'downloading' | 'verifying' | 'extracting' | 'done'; percent?: number }
 
@@ -55,10 +84,6 @@ function sha256Of(path: string): Promise<string> {
   })
 }
 
-function binaryPaths(extractedDir: string): string {
-  return process.platform === 'win32' ? extractedDir : join(extractedDir, 'bin')
-}
-
 function run(file: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(file, args, { timeout: 15_000 }, (error, stdout) => (error ? reject(error) : resolve(stdout.trim())))
@@ -73,12 +98,11 @@ export async function readNodeRuntime(baseDir: string): Promise<NodeRuntimeStatu
   } catch {
     return { installed: false }
   }
-  const binDir = binaryPaths(info.dir)
-  const nodeBinary = process.platform === 'win32' ? join(binDir, 'node.exe') : join(binDir, 'node')
+  const paths = nodeRuntimePaths(info.dir)
   try {
-    const version = await run(nodeBinary, ['--version'])
+    const version = await run(paths.node, ['--version'])
     if (version !== info.version) return { installed: false }
-    return { installed: true, version, binDir }
+    return { installed: true, version, ...paths }
   } catch {
     return { installed: false }
   }

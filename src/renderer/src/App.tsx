@@ -11,6 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { AiConnectDialog } from '@/components/ai-connect-dialog'
 import { cn } from '@/lib/utils'
 import { ApiError, apiCall, apiWebSocketUrl, type ApiUser, type CloudCommit, type CloudCommitDetail, type CloudWorkspace } from '@/lib/api'
 import { bodyModes, isBodyMode, mergeTreeSnapshots, stripLocalFilePaths, type BodyField, type BodyMode, type HeaderField, type ParamField, type RequestAuth, type ResponseContent, type ResponseDefinition, type SyncConflict, type SyncTreeNode } from '@/lib/merge'
@@ -1484,9 +1485,18 @@ function App() {
     })()
   }), [inviteTokenDraft])
   const clearAuthError = useCallback(() => setAuthError(''), [])
-  const [helpOpen, setHelpOpen] = useState(false)
-  const [appVersion, setAppVersion] = useState('')
-  useEffect(() => { if (helpOpen) void window.apiDesktop.getAppVersion().then(setAppVersion) }, [helpOpen])
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false)
+  const accountMenuRef = useRef<HTMLDivElement>(null)
+  const [aiConnectOpen, setAiConnectOpen] = useState(false)
+  useEffect(() => window.apiDesktop.onConnectAiMenu(() => setAiConnectOpen(true)), [])
+  useEffect(() => {
+    if (!accountMenuOpen) return
+    const onPointerDown = (event: MouseEvent) => { if (!accountMenuRef.current?.contains(event.target as Node)) setAccountMenuOpen(false) }
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') setAccountMenuOpen(false) }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => { document.removeEventListener('mousedown', onPointerDown); document.removeEventListener('keydown', onKeyDown) }
+  }, [accountMenuOpen])
   const [updateStatus, setUpdateStatus] = useState<{ state: 'available' | 'downloading' | 'downloaded'; version: string; percent?: number } | { state: 'error'; version: string; message: string } | null>(null)
   useEffect(() => window.apiDesktop.onUpdateStatus(setUpdateStatus), [])
 
@@ -2296,23 +2306,23 @@ function App() {
       <header className="topbar">
         <div className="wordmark">API Documentation</div>
         <div className="topbar-actions">
-          {user ? <>
-            <Button variant="outline" size="sm" onClick={() => setCreateWorkspaceOpen(true)}>New cloud workspace</Button>
-            <Button variant="outline" size="sm" onClick={() => { setInviteError(''); setInviteNotice(''); setTeamDialogOpen(true) }}>{activeWorkspace?.cloudId && activeWorkspace.role === 'owner' ? 'Team' : 'Join workspace'}</Button>
-            <span className="signed-in-email">{user.email}</span>
-            <Button variant="ghost" size="sm" onClick={() => void signOut()}>Sign out</Button>
-          </> : null}
-          <Button variant="ghost" size="sm" onClick={() => setHelpOpen(true)}>Help</Button>
+          {user && <div className="account-menu-wrap" ref={accountMenuRef}>
+            <button type="button" className="account-trigger" aria-haspopup="menu" aria-expanded={accountMenuOpen} onClick={() => setAccountMenuOpen((open) => !open)}>
+              <span className="account-avatar-chip" aria-hidden="true">{user.email.charAt(0).toUpperCase()}</span>
+              <span className="signed-in-email">{user.email}</span>
+            </button>
+            {accountMenuOpen && <div className="account-menu" role="menu">
+              <button type="button" role="menuitem" onClick={() => { setAccountMenuOpen(false); setCreateWorkspaceOpen(true) }}>New cloud workspace</button>
+              <button type="button" role="menuitem" onClick={() => { setAccountMenuOpen(false); setInviteError(''); setInviteNotice(''); setTeamDialogOpen(true) }}>{activeWorkspace?.cloudId && activeWorkspace.role === 'owner' ? 'Team' : 'Join workspace'}</button>
+              <button type="button" role="menuitem" onClick={() => { setAccountMenuOpen(false); void signOut() }}>Sign out</button>
+            </div>}
+          </div>}
           {updateStatus?.state === 'available' && <Button size="sm" onClick={() => void window.apiDesktop.downloadUpdate(updateStatus.version)}>Update to v{updateStatus.version}</Button>}
           <AuthDialog showTrigger={!user} onBeginSignIn={beginBrowserSignIn} openRequest={authOpenRequest} initialError={authError} onOpen={clearAuthError} />
         </div>
       </header>
 
-      <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>API Documentation</DialogTitle><DialogDescription>Version {appVersion || '…'}</DialogDescription></DialogHeader>
-        </DialogContent>
-      </Dialog>
+      <AiConnectDialog open={aiConnectOpen} onOpenChange={setAiConnectOpen} />
       <Dialog open={Boolean(updateStatus && updateStatus.state !== 'available')} onOpenChange={(open) => { if (!open && updateStatus?.state === 'error') setUpdateStatus(null) }}>
         <DialogContent>
           {updateStatus?.state === 'error' ? <>

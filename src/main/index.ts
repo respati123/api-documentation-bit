@@ -1,9 +1,11 @@
-import { app, BrowserWindow, dialog, ipcMain, safeStorage, shell } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, safeStorage, shell } from 'electron'
 import { DatabaseSync } from 'node:sqlite'
 import { readFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import type { WorkspaceVariables } from '../renderer/src/lib/workspace-variables'
 import { startLoopbackSignIn, type LoopbackSignIn } from './loopback-auth'
+import { installNodeRuntime, readNodeRuntime, type NodeRuntimePaths } from './node-runtime'
+import { connectAiTool, getAiConnectStatus, installCli, type AiToolId } from './ai-connect'
 import updaterModule from 'electron-updater'
 
 // electron-updater is CommonJS; named imports fail when Electron loads the ESM main bundle.
@@ -430,9 +432,56 @@ ipcMain.handle('update:download', (_event, version: string) => {
   void autoUpdater.downloadUpdate().catch((error: Error) => console.error('Auto-update download failed:', error))
 })
 ipcMain.handle('update:latest', () => latestUpdateStatus ?? null)
-ipcMain.handle('app:version', () => app.getVersion())
+function sendToWindow(channel: string, payload?: unknown): void {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload)
+}
+
+async function requireNodeRuntime(): Promise<NodeRuntimePaths> {
+  const status = await readNodeRuntime(join(app.getPath('userData'), 'runtime'))
+  if (!status.installed) throw new Error('Node.js is not installed yet. Install it first from Connect AI assistant.')
+  return status
+}
+
+ipcMain.handle('ai:status', () => getAiConnectStatus(app.getPath('userData')))
+ipcMain.handle('ai:install-node', async () => {
+  const status = await installNodeRuntime(join(app.getPath('userData'), 'runtime'), (progress) => sendToWindow('ai:node-progress', progress))
+  return status.installed ? status.version : null
+})
+ipcMain.handle('ai:install-tool', async (_event, id: 'codex' | 'claude-cli') => {
+  const runtime = await requireNodeRuntime()
+  await installCli(app.getPath('userData'), runtime, id, (line) => sendToWindow('ai:log', line))
+})
+ipcMain.handle('ai:connect', async (_event, id: AiToolId) => {
+  const runtime = await requireNodeRuntime()
+  await connectAiTool(app.getPath('userData'), runtime, id, (line) => sendToWindow('ai:log', line))
+})
+
+function showAbout(): void {
+  const options = { type: 'info' as const, title: 'About API Documentation', message: 'API Documentation', detail: `Version ${app.getVersion()}` }
+  if (mainWindow && !mainWindow.isDestroyed()) void dialog.showMessageBox(mainWindow, options)
+  else void dialog.showMessageBox(options)
+}
+
+function buildApplicationMenu(): Menu {
+  return Menu.buildFromTemplate([
+    ...(process.platform === 'darwin' ? [{ role: 'appMenu' as const }] : []),
+    { role: 'fileMenu' },
+    { role: 'editMenu' },
+    { role: 'viewMenu' },
+    { role: 'windowMenu' },
+    {
+      role: 'help',
+      submenu: [
+        { label: 'Connect AI assistant…', click: () => sendToWindow('menu:connect-ai') },
+        { type: 'separator' },
+        { label: 'About API Documentation', click: showAbout }
+      ]
+    }
+  ])
+}
 
 app.whenReady().then(() => {
+  Menu.setApplicationMenu(buildApplicationMenu())
   watchExternalWorkspaceChanges()
   setupAutoUpdate()
   if (process.defaultApp && process.argv.length >= 2) app.setAsDefaultProtocolClient('api-docs', process.execPath, [process.argv[1]])
