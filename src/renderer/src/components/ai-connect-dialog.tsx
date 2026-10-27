@@ -68,7 +68,7 @@ export function AiConnectDialog({ open, onOpenChange }: { open: boolean; onOpenC
           <div className="ai-connect-row">
             <div>
               <strong>Node.js</strong>
-              <span>{nodeReady ? `Installed ${status?.node.version}` : 'Needed to run the MCP server. Installed into the app folder, no admin rights needed.'}</span>
+              <span>{nodeReady ? `Already installed: ${status?.node.version} (${status?.node.source === 'system' ? 'this computer' : 'app folder'})` : 'Needed to run the MCP server. Installed into the app folder, no admin rights needed.'}</span>
             </div>
             {!nodeReady && (
               <Button size="sm" disabled={Boolean(busy)} onClick={() => void run('node', () => window.apiDesktop.installNodeRuntime())}>

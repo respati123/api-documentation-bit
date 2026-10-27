@@ -1,8 +1,9 @@
 import { createHash } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { createReadStream, createWriteStream } from 'node:fs'
 import { mkdir, readFile, rm, rename, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { execFile } from 'node:child_process'
+import { dirname, join } from 'node:path'
+import { execFile, spawn } from 'node:child_process'
 import { pipeline } from 'node:stream/promises'
 import { Readable } from 'node:stream'
 
@@ -11,6 +12,7 @@ import { Readable } from 'node:stream'
 
 const nodeDistUrl = 'https://nodejs.org/dist'
 const majorVersion = 22
+export const minimumNodeMajor = majorVersion
 
 export type NodeRuntimePaths = {
   root: string
@@ -22,7 +24,7 @@ export type NodeRuntimePaths = {
 
 export type NodeRuntimeStatus =
   | { installed: false }
-  | ({ installed: true; version: string } & NodeRuntimePaths)
+  | ({ installed: true; version: string; source: 'app' | 'system' } & NodeRuntimePaths)
 
 // Absolute paths inside the downloaded Node folder. Absolute paths matter because
 // GUI apps (Claude Desktop, Codex launched from a dock) do not inherit the shell PATH.
@@ -90,7 +92,51 @@ function run(file: string, args: string[]): Promise<string> {
   })
 }
 
+// Returns the absolute path of a command found on PATH, or null.
+export function findOnPath(bin: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const finder = process.platform === 'win32' ? 'where' : 'which'
+    const child = spawn(finder, [bin], { stdio: ['ignore', 'pipe', 'ignore'] })
+    let out = ''
+    child.stdout.on('data', (chunk) => { out += chunk })
+    child.on('error', () => resolve(null))
+    child.on('close', (code) => resolve(code === 0 && out.trim() ? out.trim().split(/\r?\n/)[0] : null))
+  })
+}
+
+function majorOf(version: string): number {
+  return Number(version.replace(/^v/, '').split('.')[0])
+}
+
+// A Node.js that is already on this computer and new enough. Its npx-cli.js is
+// located next to it, in the standard layout of the official installers.
+async function readSystemNode(): Promise<NodeRuntimeStatus> {
+  const found = await findOnPath(process.platform === 'win32' ? 'node.exe' : 'node')
+  if (!found) return { installed: false }
+  const version = await run(found, ['--version']).catch(() => '')
+  if (!version || majorOf(version) < minimumNodeMajor) return { installed: false }
+  // PATH may point to a version manager shim (mise, nvm, volta). Ask Node where its real binary is.
+  const nodePath = await run(found, ['-p', 'process.execPath']).catch(() => '')
+  if (!nodePath) return { installed: false }
+  const binDir = dirname(nodePath)
+  const npxCandidates = process.platform === 'win32'
+    ? [join(binDir, 'node_modules', 'npm', 'bin', 'npx-cli.js')]
+    : [join(dirname(binDir), 'lib', 'node_modules', 'npm', 'bin', 'npx-cli.js')]
+  const npxCli = npxCandidates.find((candidate) => existsSync(candidate))
+  if (!npxCli) return { installed: false }
+  const root = process.platform === 'win32' ? binDir : dirname(binDir)
+  return { installed: true, version, source: 'system', root, binDir, node: nodePath, npm: join(binDir, process.platform === 'win32' ? 'npm.cmd' : 'npm'), npxCli }
+}
+
+// Prefers the Node.js downloaded into the app folder, then a Node.js already on this
+// computer that meets the minimum version. Downloading is only needed when neither exists.
 export async function readNodeRuntime(baseDir: string): Promise<NodeRuntimeStatus> {
+  const appRuntime = await readAppNodeRuntime(baseDir)
+  if (appRuntime.installed) return appRuntime
+  return readSystemNode()
+}
+
+async function readAppNodeRuntime(baseDir: string): Promise<NodeRuntimeStatus> {
   const marker = join(baseDir, 'current.json')
   let info: { version: string; dir: string }
   try {
@@ -102,7 +148,7 @@ export async function readNodeRuntime(baseDir: string): Promise<NodeRuntimeStatu
   try {
     const version = await run(paths.node, ['--version'])
     if (version !== info.version) return { installed: false }
-    return { installed: true, version, ...paths }
+    return { installed: true, version, source: 'app', ...paths }
   } catch {
     return { installed: false }
   }
@@ -161,7 +207,7 @@ export async function installNodeRuntime(
   // Keep the marker last so a half-extracted runtime is never reported as installed.
   await writeFile(join(baseDir, 'current.json'), JSON.stringify({ version, dir: extractDir }))
 
-  const status = await readNodeRuntime(baseDir)
+  const status = await readAppNodeRuntime(baseDir)
   onProgress({ stage: 'done' })
   return status
 }

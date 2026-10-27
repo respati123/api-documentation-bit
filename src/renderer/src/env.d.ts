@@ -50,7 +50,7 @@ type LocalCommit = {
 
 type AiToolId = 'codex' | 'claude-cli' | 'claude-desktop'
 type AiConnectStatus = {
-  node: { installed: boolean; version?: string }
+  node: { installed: boolean; version?: string; source?: 'app' | 'system' }
   tools: Array<{ id: AiToolId; supported: boolean; installed: boolean; connected: boolean }>
 }
 type NodeInstallProgress = { stage: 'checking' | 'downloading' | 'verifying' | 'extracting' | 'done'; percent?: number }

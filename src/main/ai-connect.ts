@@ -3,7 +3,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { delimiter, dirname, join } from 'node:path'
-import { readNodeRuntime, type NodeRuntimePaths } from './node-runtime'
+import { findOnPath, readNodeRuntime, type NodeRuntimePaths } from './node-runtime'
 
 // Connects the local API Documentation MCP server to AI clients. The MCP server is
 // started by the client with the app's own Node runtime, so it works without the
@@ -22,7 +22,7 @@ export type AiToolStatus = {
 }
 
 export type AiConnectStatus = {
-  node: { installed: boolean; version?: string }
+  node: { installed: boolean; version?: string; source?: 'app' | 'system' }
   tools: AiToolStatus[]
 }
 
@@ -67,17 +67,6 @@ async function readJson(path: string): Promise<Record<string, unknown>> {
   }
 }
 
-function findOnPath(bin: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    const finder = process.platform === 'win32' ? 'where' : 'which'
-    const child = spawn(finder, [bin], { stdio: ['ignore', 'pipe', 'ignore'] })
-    let out = ''
-    child.stdout.on('data', (chunk) => { out += chunk })
-    child.on('error', () => resolve(null))
-    child.on('close', (code) => resolve(code === 0 && out.trim() ? out.trim().split(/\r?\n/)[0] : null))
-  })
-}
-
 async function resolveCli(userDataDir: string, id: 'codex' | 'claude-cli'): Promise<string | null> {
   const appBin = appToolBin(userDataDir, cliPackages[id].bin)
   if (existsSync(appBin)) return appBin
@@ -94,7 +83,7 @@ export async function getAiConnectStatus(userDataDir: string): Promise<AiConnect
   const cliServers = (claudeCli.mcpServers ?? {}) as Record<string, unknown>
 
   return {
-    node: runtime.installed ? { installed: true, version: runtime.version } : { installed: false },
+    node: runtime.installed ? { installed: true, version: runtime.version, source: runtime.source } : { installed: false },
     tools: [
       {
         id: 'codex',
