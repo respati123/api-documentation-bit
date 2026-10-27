@@ -52,3 +52,7 @@ The local MCP server reads the same SQLite database as the desktop app and expos
 
 Read and search tools redact authentication credentials, sensitive headers and parameters, secret-like JSON fields, and local file paths. Write changes with `preview_changes`, show that preview to the user, then call `apply_changes`. Deleting an item also requires explicit user approval and `confirmDelete: true`. Deprecation status is saved with the request and included in OpenAPI import/export.
 
+
+## Desktop releases
+
+Every push to `main` runs the release workflow. It bumps the patch version, creates the `vX.Y.Z` tag, builds the installers for Linux, macOS, and Windows, and attaches them to a draft GitHub release. Publish the draft manually in the GitHub Releases page when it is ready. To choose a minor or major bump, run the "Release desktop app" workflow manually from the Actions tab. Pushes that only change `packages/` do not create a desktop release.
